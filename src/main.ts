@@ -12,6 +12,7 @@ import DOMPurify from 'dompurify';
 import {resolveVaultImage} from './attachments';
 import {serializeRenderedNote} from './rendered-note';
 import {captureNoteFormatting, noteCssClasses} from './note-formatting';
+import {settleDataviewInline} from './dataview-inline';
 export default class PrintStudioPlugin extends Plugin {
   studioSettings!:Settings;
   private studios=new Set<PrintModal>();
@@ -102,6 +103,10 @@ class PrintModal extends Modal {
     await MarkdownRenderer.render(this.app,prepareMarkdown(markdown,true),root,this.file.path,this.renderComponent);
     if(this.isClosed)throw new Error('Print preview was closed.');
     root.querySelectorAll(':scope > .frontmatter,:scope > .frontmatter-container').forEach(element=>element.remove());
+    // Dataview fills inline fields after render resolves; wait so they are not printed as raw code.
+    const dataview=(this.app as unknown as {plugins?:{plugins?:Record<string,unknown>}}).plugins?.plugins?.['dataview'] as Parameters<typeof settleDataviewInline>[1];
+    await settleDataviewInline(root,dataview,metadata,(tag,cls)=>createEl(tag,{cls}));
+    if(this.isClosed)throw new Error('Print preview was closed.');
     const warnings:string[]=[];
     const noteResource=this.app.vault.getResourcePath(this.file);
     const lookup={byPath:(path:string)=>this.app.vault.getFileByPath(path),byLink:(link:string)=>this.app.metadataCache.getFirstLinkpathDest(getLinkpath(link),this.file.path)};
